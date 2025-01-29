@@ -1,0 +1,45 @@
+services:
+  auth-db:
+    # use the mysql image
+    image: mysql:8.0
+    container_name: auth-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-auth_db}
+      MYSQL_USER: ${MYSQL_USER:-auth_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-auth_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - auth-db-data:/var/lib/mysql
+    networks:
+      - afeaf-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    # tells it to build using a dockerfile
+    build: .
+    container_name: auth-service
+    ports:
+      - "8002:8000"
+    environment:
+      - DATABASE_URL=mysql://${MYSQL_USER:-auth_user}:${MYSQL_PASSWORD:-auth_password}@auth-db/${MYSQL_DATABASE:-auth_db}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+      - BROKER_URL=${BROKER_URL:-http://broker:8001}
+      - LLM_SERVICE_URL=${LLM_SERVICE_URL:-http://llm-service:8001}
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    networks:
+      - afeaf-network
+
+volumes:
+  auth-db-data:
+
+networks:
+  afeaf-network:
+    external: true
